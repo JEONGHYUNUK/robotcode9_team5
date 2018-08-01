@@ -35,8 +35,12 @@ int _putch();
 void cb_func_encor1(int pi, unsigned gpio, unsigned level, uint32_t tick);
 void cb_func_encor2(int pi, unsigned gpio, unsigned level, uint32_t tick);
 uint32_t start_encor1, dist_encor1,start_encor2,dist_encor2;
-void cb_func_echo(int pi, unsigned gpio, unsigned level, uint32_t tick);
-uint32_t start_tick_, dist_tick_;
+void cb_func_echo1(int pi, unsigned gpio, unsigned level, uint32_t tick);
+void cb_func_echo2(int pi, unsigned gpio, unsigned level, uint32_t tick);
+void cb_func_echo3(int pi, unsigned gpio, unsigned level, uint32_t tick);
+uint32_t start_tick_1, dist_tick_1;
+uint32_t start_tick_2, dist_tick_2;
+uint32_t start_tick_3, dist_tick_3;
 
 
 static struct termios initial_settings, new_settings;
@@ -62,9 +66,9 @@ int main(void)
         fprintf(stderr, "%s\n", pigpio_error(pi)); exit(-1);
     }
     printf("start mot\n");
-    callback(pi, ECHO_PINNO1, EITHER_EDGE, cb_func_echo);
-    callback(pi, ECHO_PINNO2, EITHER_EDGE, cb_func_echo);
-    callback(pi, ECHO_PINNO3, EITHER_EDGE, cb_func_echo);
+    callback(pi, ECHO_PINNO1, EITHER_EDGE, cb_func_echo1);
+    callback(pi, ECHO_PINNO2, EITHER_EDGE, cb_func_echo2);
+    callback(pi, ECHO_PINNO3, EITHER_EDGE, cb_func_echo3);
     printf("start manual mode press number 1\nstart auto mode press number 2\n");
     scanf("%d",&num2);
     
@@ -88,96 +92,56 @@ int main(void)
 
 void auto_ctrl(int pi, int range)
 {
-    float distance1, distance2= 10, distance3=10;
-  init_keyboard();
-            while(1)
-            {  
+    float distance1, distance2, distance3;
+    init_keyboard();
+    setgpiomode(pi,range);
+    int SNR_D = 50;
+    while(1)
+    {  
+        gpio_trigger(pi, TRIG_PINNO1, 10, PI_HIGH);
+        gpio_trigger(pi, TRIG_PINNO2, 10, PI_HIGH);
+        gpio_trigger(pi, TRIG_PINNO3, 10, PI_HIGH);
+        time_sleep(0.05);
+        if((dist_tick_1 && start_tick_1) && (dist_tick_2 && start_tick_2) && (dist_tick_3 && start_tick_3))
+        {
+            distance1 = dist_tick_1 / 1000000. * 340 / 2 * 100;
+            distance2 = dist_tick_2 / 1000000. * 340 / 2 * 100;
+            distance3 = dist_tick_3 / 1000000. * 340 / 2 * 100;
+            if(distance1 < SNR_D)
+            {
+                printf("정면 8cm 이내\n");
+                stop_pwm(pi);
+                if((distance2>=SNR_D)&&(distance3>=SNR_D))
                 {
-                setgpiomode(pi,range);
-                gpio_trigger(pi, TRIG_PINNO1, 5, PI_HIGH);
-                time_sleep(0.005);
-                if(dist_tick_ && start_tick_)
-                {
-                    distance1 = dist_tick_ / 1000000. * 340 / 2 * 100;
-                    if(distance1 < 8)
-                    {
-                        printf("정면 8cm 이내\n");
-                        stop_pwm(pi);
-                        if((distance2 < 8)&&(distance3 < 8))
-                        {
-                            back_pwm(pi,range);
-                            time_sleep(0.005); 
-                        }
-                        else if(distance2 < 8)
-                        {
-                            right_pwm(pi,range);
-                            time_sleep(0.005);
-                            stop_pwm(pi);
-                        }
-                        else if(distance3 < 8)
-                        {
-                            left_pwm(pi,range);
-                            time_sleep(0.005);
-                            stop_pwm(pi);
-                        }
-                    }
-                    else if(distance1 >=8)
-                    {
-                        printf("정면 초음파 센서 \n interval : %6dus, Distance : %6.1f cm\n", dist_tick_, distance1);
-                        go_pwm(pi,range);
-                    }
-                }
-                else
-                    printf("sense error\n");
-                time_sleep(0.05);
-                }
-                {
-                   
-                setgpiomode(pi,range);
-                gpio_trigger(pi, TRIG_PINNO2, 10, PI_HIGH);
-                time_sleep(0.05);
-                if(dist_tick_ && start_tick_)
-                {
-                    distance2 = dist_tick_ / 1000000. * 340 / 2 * 100;
-                    if(distance2 < 8)
-                    {
-                        printf("왼쪽 8cm 이내\n");
-                    }
-                    else if(distance2 >=8)
-                    {
-                        printf("왼쪽 초음파 센서 \n interval : %6dus, Distance : %6.1f cm\n", dist_tick_, distance2);
-                    }
-                }
-                else
-                    printf("sense error\n");
-                time_sleep(0.05);
-
+                    printf("기본값 오른쪽으로 회전\n");
+                    right_pwm(pi,range);
                 }
 
-                {  
-                setgpiomode(pi,range);
-                gpio_trigger(pi, TRIG_PINNO3, 10, PI_HIGH);
-                time_sleep(0.05);
-                if(dist_tick_ && start_tick_)
-                {
-                    distance3 = dist_tick_ / 1000000. * 340 / 2 * 100;
-                    if(distance3 < 8)
-                    {
-                        printf("오른쪽 8cm 이내\n");
-                    }
-                    else if(distance3 >=8)
-                    {
-                        printf("오른쪽 초음파 센서 \n interval : %6dus, Distance : %6.1f cm\n", dist_tick_, distance3);
-                    }
-                }
-                else
-                    printf("sense error\n");
-                time_sleep(0.05);
-
-
-
-                }
             }
+            if((distance1<SNR_D)&&(distance2 < SNR_D)&&(distance3 < SNR_D))
+            {
+                printf("정면,좌,우모두8cm 이내\n");
+                back_pwm(pi,range);
+            }
+            else if((distance1<SNR_D)&& (distance2 < SNR_D))
+            {
+                printf("정면,왼쪽  8cm 이내\n");
+                right_pwm(pi,range);
+            }
+            else if((distance1<SNR_D)&& (distance3 < SNR_D))
+            {
+                printf("정면,오른쪽  8cm 이내\n");
+                left_pwm(pi,range);
+            }
+            else if(distance1 >=SNR_D)
+            {
+                printf("Distance : 정면 :  %6.1f 왼쪽 :  %6.1f 오른쪽:%6.1f cm\n", distance1,distance2,distance3);
+                go_pwm(pi,range);
+            }
+        else
+            printf("sense error\n");
+        }
+        }
 }
 
 void manual_ctrl(int pi,int range)
@@ -229,13 +193,31 @@ void manual_ctrl(int pi,int range)
     }
 }
 
-void cb_func_echo(int pi, unsigned gpio, unsigned level, uint32_t tick)
+void cb_func_echo1(int pi, unsigned gpio, unsigned level, uint32_t tick)
 {
     if(level == PI_HIGH)
-        start_tick_ = tick;
+        start_tick_1 = tick;
     else if(level == PI_LOW)
-        dist_tick_ = tick - start_tick_;
+        dist_tick_1 = tick - start_tick_1;
 }
+
+void cb_func_echo2(int pi, unsigned gpio, unsigned level, uint32_t tick)
+{
+    if(level == PI_HIGH)
+        start_tick_2 = tick;
+    else if(level == PI_LOW)
+        dist_tick_2 = tick - start_tick_2;
+}
+
+
+void cb_func_echo3(int pi, unsigned gpio, unsigned level, uint32_t tick)
+{
+    if(level == PI_HIGH)
+        start_tick_3 = tick;
+    else if(level == PI_LOW)
+        dist_tick_3 = tick - start_tick_3;
+}
+
 
 void setgpiomode(int pi,int range)
 {   
