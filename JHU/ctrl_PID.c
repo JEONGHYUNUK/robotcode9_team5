@@ -19,8 +19,8 @@ void cb_func_encor1(int pi, unsigned gpio, unsigned level, uint32_t tick);
 void cb_func_encor2(int pi, unsigned gpio, unsigned level, uint32_t tick);
 uint32_t start_encor1, dist_encor1,start_encor2,dist_encor2;
 int num2,num1;
-int wgt1=6000; //wgt for Right
-int wgt2=6000; //wgt for Left
+int wgt1=700; //wgt for Right
+int wgt2=700; //wgt for Left
 void setgpiomode(int pi,int range);
 int stop_pwm(int pi);
 
@@ -64,29 +64,48 @@ int main(void)
     while(1)
     {
         go_pwm(pi,range);
-          if(num[0]>num[1])
-            S = 3.141592*6*num[1]/40;
-        else if(num[1]>num[0])
-            S = 3.141592*6*num[0]/40;
-        current_time=time_time(); 
+       current_time=time_time(); 
         
        // printf("확인1번 겟커런트까지\n");
 
         if((last_time+1)<=current_time)
         {
             last_time=current_time;
+            if(num[0]>=num[1])
+            S = 3.141592*6*num[1]/40;
+            else if(num[1]>num[0])
+            S = 3.141592*6*num[0]/40;
+
+        
             printf("오른쪽 엔코더 읽은 횟수 : %lf\n",num[0]);
             printf("왼쪽 엔코더 읽은 횟수 : %lf\n",num[1]);
-            if(num[0]>num[1])
             ang[0] =0.0942*(num[0]-num[1]); //라디안으로 표시 360도 = 2PI 6/10*2*3.14/40*
 
 
             printf("ang: %lf \n" , ang[0]);
             sum_ang[0] += ang[0];
-            err[0] = S*sin(6.28+0.6*sum_ang[0]);
+
+            //sum_ang에 대한 환산값
+            if(sum_ang[0]>=0 && sum_ang[0]<(3.141592/2))
+               err[0] = S*sin(0.6*sum_ang[0]);
+            else if (sum_ang[0]>=(3.141592/2) && sum_ang[0]<3.141592)
+                err[0] = S*(1+sin(0.6*(sum_ang[0]-(3.141592/2))));
+            else if (sum_ang[0]>=(3.141592) && sum_ang[0]<(3.141592*3/2))
+                err[0] = S*(2+sin(0.6*(sum_ang[0]-3.141592)));
+            else if (sum_ang[0]>=(3.141592*3/2) && sum_ang[0]<(3.141592*2))
+                err[0] = S*(3+sin(0.6*(sum_ang[0]-(3.141592*3/2))));
+           
+            else if(sum_ang[0]<=0 && sum_ang[0]>(-3.141592/2))
+               err[0] = S*sin(0.6*sum_ang[0]);
+            else if (sum_ang[0]<=(-3.141592/2) && sum_ang[0]>-3.141592)
+                err[0] = S*(-1+sin(0.6*(sum_ang[0]-(-3.141592/2))));
+            else if (sum_ang[0]<=(-3.141592) && sum_ang[0]>(-3.141592*3/2))
+                err[0] = S*(-2+sin(0.6*(sum_ang[0]-(-3.141592))));
+            else if (sum_ang[0]<=(-3.141592*3/2) && sum_ang[0]>(-3.141592*2))
+                err[0] = S*(-3+sin(0.6*(sum_ang[0]-(-3.141592*3/2))));
+
             printf("err: %lf \n" , err[0]);
             sum_err[0] += err[0];
-            printf("sum_err: %lf \n" , sum_err[0]);
             Kp_term[0] = Kp1*sum_err[0];
             Ki_term[0] = Ki1*sum_err[0]*dt;
             Kd_term[0] = Kd1*(sum_err[0]-prev_err[0])/dt;
@@ -94,25 +113,18 @@ int main(void)
             printf("sum_err[0] : %lf   sum_ang[0]: %lf \n",sum_err[0],sum_ang[0]);
             printf("control1 : %lf Kp1 : %lf Kd1 : %lf Ki1 : %lf \n",control[0],Kp_term[0],Kd_term[0],Ki_term[0]);
             printf("wgt1 : %d wgt2: %d \n",wgt1,wgt2);
-            wgt1 -=control[0];  //right
-            wgt2 +=control[0];   //left
+            if(control[0]>=0)
+            { wgt1 = 650;    wgt2 = 750;}
+            else if(control[0]<0)
+            { wgt1 = 750; wgt2 = 650;}
+
+
+           // wgt1 =(double)wgt1 - control[0];  //right
+           // wgt2 =(double)wgt2 + control[0];   //left
             num[0]=0;
             num[1]=0;
             prev_err[0] = sum_err[0];
         }
-
-        /*
-           ang[1] = 6/10*2*PI/40*(num[0]-num[1]); //라디안으로 표시 360도 = 2PI
-           sum_ang[1] += ang[1];
-           err[1] = S*sin(6/10*sum_ang[1]);
-           Kp_term[1] = Kp2*err[1];
-           Ki_term[1] = Ki2*err[1]*dt;
-           Kd_term[1] = (err[1]-prev_err[1])*Kd2;
-           sum_err[1] += err[1];
-           control[1] = Kp_term[1] + Ki_term[1] + Kd_term[1];
-         */
-        //       printf("control2 : %lf Kp2 : %lf Kd2 : %lf Ki2 : %lf \n",control2,Kp_term2,Kd_term2,Ki_term2);
-
         else if(num[0]>3000||num[1]>3000)
             printf("INPUT ERROR!!!!\n");
         else if(  dist_encor2>=100000000 &&dist_encor1>=100000000)
@@ -143,8 +155,8 @@ void cb_func_encor2(int pi, unsigned gpio, unsigned level, uint32_t tick)
 
 int go_pwm(int pi,int range)
 {
-    set_PWM_dutycycle(pi,INPUT2,(range*wgt1/10000)); gpio_write(pi,INPUT1,PI_LOW);
-    set_PWM_dutycycle(pi,INPUT3,(range*wgt2/10000)); gpio_write(pi,INPUT4,PI_LOW);
+    set_PWM_dutycycle(pi,INPUT2,(range*wgt1/1000)); gpio_write(pi,INPUT1,PI_LOW);
+    set_PWM_dutycycle(pi,INPUT3,(range*wgt2/1000)); gpio_write(pi,INPUT4,PI_LOW);
     return 1;
 }
 

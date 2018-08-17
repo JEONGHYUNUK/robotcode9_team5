@@ -73,8 +73,8 @@ uint32_t start_tick_2, dist_tick_2;
 uint32_t start_tick_3, dist_tick_3;
 
 int key, camera;
-int wgt1=780; //wgt for Right
-int wgt2=650; //wgt for Left
+int wgt1=720; //wgt for Right
+int wgt2=640; //wgt for Left
 int range=8000;
 int num3 = 0, num4 = 0;
 int pulse1=1500, pulse2=1500;
@@ -82,7 +82,6 @@ int pulse1=1500, pulse2=1500;
 int main(void)
 {
   //  human();
-    void *tret;
     pthread_t tid1;
     int err;
     int i;
@@ -122,36 +121,35 @@ int main(void)
 
 void auto_ctrl(int pi, int range)
 {
-    void *tret;
     float distance1, distance2, distance3;
     setgpiomode(pi,range);
-    int SNR_D = 10;
+    int SNR_D = 30;
     while(key == 6)
     {
         camera_updown(pi);
         camera_leftright(pi);
- 
 
-            if(camera == 1)
-            {
-                camera_turn_left(pi);
-                camera = 0;
-            }
-            if(camera == 2)
-            {
-                camera_turn_right(pi);
-                camera = 0;
-            }
-            if(camera == 3)
-            {
-                camera_up(pi);
-                camera = 0;
-            }
-            if(camera == 4)
-            {
-                camera_down(pi);
-                camera = 0;
-            }        gpio_trigger(pi, TRIG_PINNO1, 10, PI_HIGH);
+
+        if(camera == 1)
+        {
+            camera_turn_left(pi);
+            camera = 0;
+        }
+        if(camera == 2)
+        {
+            camera_turn_right(pi);
+            camera = 0;
+        }
+        if(camera == 3)
+        {
+            camera_up(pi);
+            camera = 0;
+        }
+        if(camera == 4)
+        {
+            camera_down(pi);
+            camera = 0;
+        }        gpio_trigger(pi, TRIG_PINNO1, 10, PI_HIGH);
         gpio_trigger(pi, TRIG_PINNO2, 10, PI_HIGH);
         gpio_trigger(pi, TRIG_PINNO3, 10, PI_HIGH);
         time_sleep(0.05);
@@ -162,7 +160,7 @@ void auto_ctrl(int pi, int range)
             distance3 = dist_tick_3 / 1000000. * 340 / 2 * 100;
             if(distance1 < SNR_D)
             {
-                printf("정면 50cm 이내\n");
+                printf("정면 30cm 이내\n");
                 stop_pwm(pi);
                 if((distance2>=SNR_D)&&(distance3>=SNR_D))
                 {
@@ -174,29 +172,29 @@ void auto_ctrl(int pi, int range)
             }
             if((distance1<SNR_D)&&(distance2 < SNR_D)&&(distance3 < SNR_D))
             {
-                printf("정면,좌,우모두50cm 이내\n");
+                printf("정면,좌,우모두30cm 이내\n");
                 turn_encor(pi,range);
-                key = 0;
             }
             else if((distance1<SNR_D)&& (distance2 < SNR_D))
             {
-                printf("정면,왼쪽  50cm 이내\n");
+                printf("정면,왼쪽  30cm 이내\n");
                 right_encor(pi,range);
-                key = 0;
             }
             else if((distance1<SNR_D)&& (distance3 < SNR_D))
             {
-                printf("정면,오른쪽  50cm 이내\n");
+                printf("정면,오른쪽  30cm 이내\n");
                 left_encor(pi,range);
-                key = 0;
             }
             else if(distance1 >=SNR_D)
             {
                 printf("Distance : 정면 :  %6.1f 왼쪽 :  %6.1f 오른쪽:%6.1f cm\n", distance1,distance2,distance3);
                 go_pwm(pi,range);
             }
-        else
-            printf("sense error\n");
+            else
+            {  
+                printf("sense error\n");
+                key = 6;
+            }
         }
     }
 }
@@ -204,7 +202,6 @@ void auto_ctrl(int pi, int range)
 void manual_ctrl(int pi,int range)
 {
     int c;
-    void *tret;
     setgpiomode(pi,range);
 
     while(1)
@@ -352,27 +349,28 @@ void setgpiomode(int pi,int range)
 
 int left_encor(int pi, int range)
 {
+    key = 0;
     stop_pwm(pi);
     num3 = 0;
     num4 = 0;
     left_pwm(pi, range);
     while(1)
     {
-    if(num3 > 7)
-    {
-        stop_pwm(pi);
-        num3 = 0;
-        num4 = 0;
-        go_pwm(pi, range);
-        time_sleep(0.1);
-        break;
-    }
+        if(num3 > 7)
+        {
+            stop_pwm(pi);
+            num3 = 0;
+            num4 = 0;
+            go_pwm(pi, range);
+            break;
+        }
     }
     key = 6;
 }
 
 int right_encor(int pi, int range)
 {
+    key = 0;
     stop_pwm(pi);
     num3 = 0;
     num4 = 0;
@@ -385,7 +383,6 @@ int right_encor(int pi, int range)
             num3 = 0;
             num4 = 0;
             go_pwm(pi, range);
-            time_sleep(0.1);
             break;
         }
     }
@@ -394,6 +391,7 @@ int right_encor(int pi, int range)
 
 int turn_encor(int pi, int range)
 {
+    key = 0;
     stop_pwm(pi);
     num3 = 0;
     num4 = 0;
@@ -406,7 +404,6 @@ int turn_encor(int pi, int range)
             num3 = 0;
             num4 = 0;
             go_pwm(pi, range);
-            time_sleep(0.1);
             break;
         }
     }
@@ -762,33 +759,6 @@ void camera_leftright(int pi)
     }
 }
 
-/*void human(void)
-{
-    if(!bcm2835_init()){
-        printf("Please run this with sudo\n");
-    }
-
-    bcm2835_gpio_fsel(SENSOR, BCM2835_GPIO_FSEL_INPT);
-    bcm2835_gpio_fsel(LED, BCM2835_GPIO_FSEL_OUTP);
-    bcm2835_gpio_set_pud(SENSOR, BCM2835_GPIO_PUD_UP);
-    uint8_t state = ACTIVE_VALUE;
-
-    while (1) {
-        state = bcm2835_gpio_lev(SENSOR); //HIGH or LOW?
-        if(state != ACTIVE_VALUE)
-        {
-            //Sensor not active
-        }
-        else
-        {
-            break;
-        }
-    }
-}
-#undef SENSOR
-#undef LED
-#undef ACTIVE_VALUE
-*/
 void cb_func_go(int pi, unsigned gpio, unsigned level, uint32_t tick)
 {
     if(level == PI_HIGH)
